@@ -12,7 +12,8 @@
   --bg:#EEF1F4; --surface:#FFFFFF; --ink:#18202B; --muted:#5D6978; --line:#D5DBE2;
   --accent:#1F4E8C; --accent-soft:#E3ECF8; --on-accent:#FFFFFF;
   --sun:#B3261E; --sat:#1F5FB8;
-  --k-meet:#1F5FB8; --k-due:#B3261E; --k-out:#2E7D4F; --k-other:#6B7380;
+  /* 担当の色：1人目・2人目・2人共通 */
+  --p1:#1F5FB8; --p2:#B04A0A; --pc:#7046B8; --on-p:#FFFFFF;
   --danger:#B3261E; --ok:#2E7D4F;
   --font-body:"IBM Plex Sans JP","Hiragino Sans","Yu Gothic UI","Meiryo",system-ui,sans-serif;
   --font-num:"IBM Plex Mono",ui-monospace,Consolas,monospace;
@@ -22,7 +23,7 @@
   --bg:#12161C; --surface:#1B2129; --ink:#E6EAF0; --muted:#98A3B1; --line:#2E3742;
   --accent:#8FB4EA; --accent-soft:#233349; --on-accent:#10161E;
   --sun:#F08A82; --sat:#8FB4EA;
-  --k-meet:#7FAAF0; --k-due:#F08A82; --k-out:#79C79A; --k-other:#9AA3AE;
+  --p1:#7FAAF0; --p2:#F2A65A; --pc:#B79AF0; --on-p:#10161E;
   --danger:#F08A82; --ok:#79C79A; color-scheme:dark}}
 
 *{box-sizing:border-box}
@@ -67,7 +68,7 @@ header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-betw
 .num{font-family:var(--font-num);font-size:13px;width:24px;height:24px;display:inline-grid;place-items:center;border-radius:50%}
 .cell.sun .num{color:var(--sun)} .cell.sat .num{color:var(--sat)}
 .cell.today .num{background:var(--accent);color:var(--on-accent)}
-.chip{font-size:11px;line-height:1.35;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--kc);background:var(--accent-soft)}
+.chip{font-size:11px;line-height:1.35;padding:1px 4px;border-radius:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;border-left:3px solid var(--kc);background:var(--accent-soft);background:color-mix(in srgb,var(--kc) 16%,var(--surface))}
 .more{font-size:11px;color:var(--muted)}
 .dots{display:none;gap:3px;flex-wrap:wrap;padding-left:2px}
 .dots i{width:6px;height:6px;border-radius:50%;background:var(--kc)}
@@ -82,20 +83,21 @@ header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-betw
 .ev .title{font-weight:700;overflow-wrap:anywhere}
 .ev .meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
 .ev .memo{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}
-.kind{font-size:11px;font-weight:700;color:var(--kc)}
-.who{font-size:11px;font-weight:700;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--ink)}
-.who.common{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
-.tag{font-size:10px;font-weight:700;padding:0 3px;margin-right:3px;border-radius:3px;background:var(--accent);color:var(--on-accent)}
+.kind{font-size:11px;font-weight:700;color:var(--muted)}
+.who{font-size:11px;font-weight:700;padding:0 8px;border-radius:999px;background:var(--kc);color:var(--on-p)}
+.tag{font-size:10px;font-weight:700;padding:0 3px;margin-right:3px;border-radius:3px;background:var(--kc);color:var(--on-p)}
+.mebox{display:inline-flex;align-items:center;gap:6px}
+.mebox i{width:10px;height:10px;border-radius:50%;background:var(--kc)}
 .empty{color:var(--muted);font-size:14px;padding:18px 4px;text-align:center;border:1px dashed var(--line);border-radius:8px;list-style:none}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
 .legend i{width:8px;height:8px;border-radius:2px;background:var(--kc)}
 .banner{font-size:13px;padding:10px 12px;border-radius:8px;background:var(--accent-soft);border:1px solid var(--danger)}
 
-/* ログイン画面 */
-.login{max-width:380px;margin:8vh auto 0;display:flex;flex-direction:column;gap:14px}
-.login h1{margin:0;font-size:22px}
-.login p{margin:0;color:var(--muted);font-size:13px}
+/* 利用者の選択 */
+.pick{display:flex;flex-direction:column;gap:10px}
+.pick button{display:flex;align-items:center;gap:10px;padding:12px 14px;border:1px solid var(--line);border-left:6px solid var(--kc);border-radius:8px;background:var(--surface);font-size:16px;font-weight:700;text-align:left}
+.pick button:hover{border-color:var(--accent);border-left-color:var(--kc)}
 
 /* 入力シート */
 .overlay{position:fixed;inset:0;background:rgba(10,14,20,.45);display:flex;align-items:flex-end;justify-content:center;padding:16px;padding-bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:10}
@@ -123,26 +125,14 @@ textarea{min-height:72px;resize:vertical}
 
 <!-- ===== 設定ミス表示 ===== -->
 <div class="wrap" id="configView" hidden>
-  <div class="banner">
+  <div class="banner" id="configMsg">
     接続設定がまだです。<code>index.html</code> の先頭付近にある <code>SUPABASE_URL</code> と
     <code>SUPABASE_KEY</code> を、自分の Supabase プロジェクトの値に書き換えてください。
   </div>
 </div>
 
-<!-- ===== ログイン画面 ===== -->
-<div class="wrap" id="loginView" hidden>
-  <form class="login panel" id="loginForm" novalidate>
-    <h1>ふたりの予定帳</h1>
-    <p>登録済みのメールアドレスとパスワードでログインしてください。</p>
-    <div class="field"><label for="l-email">メールアドレス</label><input type="email" id="l-email" autocomplete="username" required></div>
-    <div class="field"><label for="l-pass">パスワード</label><input type="password" id="l-pass" autocomplete="current-password" required></div>
-    <div class="err" id="loginErr" hidden></div>
-    <button type="submit" class="btn primary" id="loginBtn">ログイン</button>
-  </form>
-</div>
-
 <!-- ===== メイン画面 ===== -->
-<div class="wrap" id="appView" hidden>
+<div class="wrap" id="appView">
   <header>
     <div class="brand">
       <h1>ふたりの予定帳</h1>
@@ -150,9 +140,8 @@ textarea{min-height:72px;resize:vertical}
     </div>
     <div class="userbox">
       <span class="status" id="status"><i></i><span id="statusText">接続中…</span></span>
-      <span id="meName"></span>
-      <button class="btn small" id="nameBtn">表示名を変更</button>
-      <button class="btn small" id="logoutBtn">ログアウト</button>
+      <span class="mebox" id="meBox" hidden><i></i><span id="meName"></span></span>
+      <button class="btn small" id="switchBtn" hidden>利用者を切り替え</button>
     </div>
   </header>
 
@@ -214,18 +203,14 @@ textarea{min-height:72px;resize:vertical}
   </form>
 </div>
 
-<!-- ===== 表示名の入力 ===== -->
-<div class="overlay" id="nameOverlay" hidden>
-  <form class="sheet" id="nameForm" novalidate>
-    <h3>表示名</h3>
-    <p style="margin:0;font-size:13px;color:var(--muted)">予定に「誰が登録・更新したか」として表示される名前です。</p>
-    <div class="field"><label for="n-name">表示名（20文字まで）</label><input type="text" id="n-name" maxlength="20" placeholder="例：市毛"></div>
-    <div class="err" id="nameErr" hidden></div>
-    <div class="actions"><div class="right">
-      <button type="button" class="btn" id="nameClose">キャンセル</button>
-      <button type="submit" class="btn primary" id="nameSave">保存</button>
-    </div></div>
-  </form>
+<!-- ===== 利用者の選択（この端末を誰が使うか） ===== -->
+<div class="overlay" id="pickOverlay" hidden>
+  <div class="sheet">
+    <h3>あなたはどちらですか？</h3>
+    <p style="margin:0;font-size:13px;color:var(--muted)">この端末で使う人を選んでください。新しい予定の担当や「更新した人」に使います。あとから「利用者を切り替え」で変えられます。</p>
+    <div class="pick" id="pickList"></div>
+    <div class="actions"><div class="right"><button type="button" class="btn" id="pickClose">閉じる</button></div></div>
+  </div>
 </div>
 
 <!-- Supabase の公式ライブラリ（バージョン固定） -->
@@ -243,10 +228,10 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   "use strict";
 
   const KINDS = [
-    { id: "meet",  label: "打合せ", color: "var(--k-meet)" },
-    { id: "due",   label: "締切",   color: "var(--k-due)" },
-    { id: "out",   label: "外出",   color: "var(--k-out)" },
-    { id: "other", label: "その他", color: "var(--k-other)" },
+    { id: "meet",  label: "打合せ" },
+    { id: "due",   label: "締切" },
+    { id: "out",   label: "外出" },
+    { id: "other", label: "その他" },
   ];
   const KIND_BY = Object.fromEntries(KINDS.map(k => [k.id, k]));
   const DOW = ["日", "月", "火", "水", "木", "金", "土"];
@@ -258,89 +243,91 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   const hhmm = t => (t ? String(t).slice(0, 5) : "");               // "09:00:00" → "09:00"
   const md = s => { const p = parseYmd(s); return `${p.m + 1}/${p.d}`; };   // "2026-10-05" → "10/5"
 
-  /* ---------- 24時間で自動ログアウト（このブラウザに最後のログイン時刻を記録） ---------- */
-  const LOGIN_KEY = "futari_login_at";
-  const LOGIN_MAX_MS = 24 * 60 * 60 * 1000;
-  const getLoginAt = () => { try { return Number(localStorage.getItem(LOGIN_KEY)) || 0; } catch (e) { return 0; } };
-  const setLoginAt = t => { try { localStorage.setItem(LOGIN_KEY, String(t)); } catch (e) {} };
-  const clearLoginAt = () => { try { localStorage.removeItem(LOGIN_KEY); } catch (e) {} };
-  const loginExpired = () => { const t = getLoginAt(); return t > 0 && Date.now() - t > LOGIN_MAX_MS; };
+  /* ---------- この端末の利用者（ブラウザに記録） ---------- */
+  const ME_KEY = "futari_me";
+  const getMe = () => { try { return localStorage.getItem(ME_KEY) || null; } catch (e) { return null; } };
+  const saveMe = id => { try { localStorage.setItem(ME_KEY, id); } catch (e) {} };
 
   const state = {
-    sb: null, session: null, me: null,
-    events: [], profiles: {}, loaded: false,
+    sb: null, me: getMe(),
+    events: [], members: [], loaded: false,              // members: [{id, name}]（並び順で色が決まる）
     viewY: new Date().getFullYear(), viewM: new Date().getMonth(), sel: todayStr(),
     editingId: null, formKind: "meet", formAssignee: null, channel: null, fetchSeq: 0,
-    expiredMsg: false,
   };
 
-  /* ---------- 画面の切り替え ---------- */
-  function show(view) {
-    ["configView", "loginView", "appView"].forEach(v => { $(v).hidden = v !== view; });
-  }
+  /* ---------- 担当の名前と色（2人とも同じ色に見える） ---------- */
+  const COMMON_COLOR = "var(--pc)";
+  const MEMBER_COLORS = ["var(--p1)", "var(--p2)"];
+  const memberIndex = id => state.members.findIndex(m => m.id === id);
+  const nameOf = id => { const m = state.members.find(x => x.id === id); return m ? m.name : "メンバー"; };
+  const colorOf = id => {
+    if (!id) return COMMON_COLOR;
+    const i = memberIndex(id);
+    return i >= 0 ? MEMBER_COLORS[i % MEMBER_COLORS.length] : COMMON_COLOR;
+  };
+  const whoLabel = id => (id ? nameOf(id) : "2人共通");
+
+  /* ---------- 画面の部品 ---------- */
   function banner(msg) { $("banner").textContent = msg || ""; $("banner").hidden = !msg; }
   function setStatus(text, live) { $("statusText").textContent = text; $("status").className = "status" + (live ? " live" : ""); }
   function showErr(id, msg) { $(id).textContent = msg || ""; $(id).hidden = !msg; }
 
   /* ---------- 起動 ---------- */
   if (!window.supabase || SUPABASE_URL.includes("YOUR-PROJECT-ID") || SUPABASE_KEY.startsWith("YOUR-")) {
-    show("configView");
-    if (!window.supabase) $("configView").firstElementChild.textContent = "Supabase のライブラリを読み込めませんでした。インターネット接続を確認して、ページを再読み込みしてください。";
+    $("appView").hidden = true; $("configView").hidden = false;
+    if (!window.supabase) $("configMsg").textContent = "Supabase のライブラリを読み込めませんでした。インターネット接続を確認して、ページを再読み込みしてください。";
     return;
   }
-  state.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
-  // ログイン状態の変化を監視（コールバック内では他の Supabase 呼び出しを直接 await しない）
-  state.sb.auth.onAuthStateChange((event, session) => {
-    setTimeout(() => onSession(session), 0);
+  // ログインは使わない（公開キーだけで接続する）
+  state.sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
   });
 
-  async function onSession(session) {
-    const prevUser = state.session && state.session.user.id;
-    state.session = session;
-    if (!session) {
-      stopRealtime(); clearLoginAt(); state.events = []; state.loaded = false; show("loginView");
-      if (state.expiredMsg) { showErr("loginErr", "ログインから24時間たったため、自動でログアウトしました。もう一度ログインしてください。"); state.expiredMsg = false; }
+  renderLegend(); render();
+  start();
+
+  async function start() {
+    await loadMembers();
+    if (!state.members.length) {
+      setStatus("接続できません", false);
+      banner("利用者の一覧を読み込めませんでした。Supabase で migration_v3.sql を実行済みか、プロジェクトが一時停止していないか確認してください。");
       return;
     }
-    if (!getLoginAt()) setLoginAt(Date.now());                  // 記録がなければ今からの24時間
-    if (loginExpired()) { await expireLogin(); return; }
-    if (prevUser === session.user.id && state.loaded) return;  // トークン更新だけなら何もしない
-    state.me = session.user.id;
-    show("appView");
-    renderLegend(); render();
-    await loadProfiles();
-    if (!state.profiles[state.me]) openNameForm(true);
+    if (!state.me || memberIndex(state.me) < 0) openPicker(true); else renderMe();
     await loadEvents();
     startRealtime();
   }
 
-  /* ---------- ログイン／ログアウト ---------- */
-  $("loginForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const email = $("l-email").value.trim(), password = $("l-pass").value;
-    if (!email || !password) return showErr("loginErr", "メールアドレスとパスワードを入力してください。");
-    showErr("loginErr", ""); $("loginBtn").disabled = true;
-    setLoginAt(Date.now());                                      // ここから24時間ログインが続く
-    const { error } = await state.sb.auth.signInWithPassword({ email, password });
-    $("loginBtn").disabled = false;
-    if (error) {
-      clearLoginAt();
-      const bad = error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message || "");
-      showErr("loginErr", bad ? "メールアドレスかパスワードが違います。" : "ログインできませんでした（" + (error.message || "通信エラー") + "）。");
-    } else { $("l-pass").value = ""; }
-  });
-  // scope: "local" = この端末だけログアウト（相手や自分の別端末には影響しない）
-  $("logoutBtn").addEventListener("click", async () => { await state.sb.auth.signOut({ scope: "local" }); });
-
-  async function expireLogin() {
-    state.expiredMsg = true;
-    clearLoginAt();
-    await state.sb.auth.signOut({ scope: "local" });
+  /* ---------- 利用者 ---------- */
+  async function loadMembers() {
+    const { data, error } = await state.sb.from("profiles").select("id, display_name").order("id");
+    if (error) return;
+    state.members = data.map(p => ({ id: p.id, name: p.display_name }));
+    renderLegend();
   }
-  function checkExpiry() { if (state.session && loginExpired()) expireLogin(); }
-  setInterval(checkExpiry, 60 * 1000);                           // 開きっぱなしでも1分ごとに確認
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkExpiry(); });
+
+  function renderMe() {
+    const ok = state.me && memberIndex(state.me) >= 0;
+    $("meBox").hidden = !ok; $("switchBtn").hidden = false;
+    if (ok) { $("meBox").style.setProperty("--kc", colorOf(state.me)); $("meName").textContent = nameOf(state.me) + " さんとして使用中"; }
+  }
+
+  function openPicker(first) {
+    const list = $("pickList"); list.textContent = "";
+    state.members.forEach(m => {
+      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", colorOf(m.id));
+      b.textContent = m.name;
+      b.addEventListener("click", () => {
+        state.me = m.id; saveMe(m.id);
+        $("pickOverlay").hidden = true; renderMe(); render();
+      });
+      list.append(b);
+    });
+    $("pickClose").hidden = !!first;                            // 初回は必ず選んでもらう
+    $("pickOverlay").hidden = false;
+  }
+  $("switchBtn").addEventListener("click", () => openPicker(false));
+  $("pickClose").addEventListener("click", () => { $("pickOverlay").hidden = true; });
 
   /* ---------- データの読み込み ---------- */
   function visibleRange() {
@@ -364,21 +351,13 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     }
     banner("");
     state.events = data; state.loaded = true;
-    if (data.some(ev => (ev.updated_by && !state.profiles[ev.updated_by]) || (ev.assignee && !state.profiles[ev.assignee]))) await loadProfiles();
     render();
-  }
-
-  async function loadProfiles() {
-    const { data, error } = await state.sb.from("profiles").select("id, display_name");
-    if (error) return;
-    state.profiles = Object.fromEntries(data.map(p => [p.id, p.display_name]));
-    $("meName").textContent = state.profiles[state.me] ? state.profiles[state.me] + " さん" : "";
   }
 
   /* ---------- リアルタイム更新 ---------- */
   let refetchTimer = null;
   function startRealtime() {
-    stopRealtime();
+    if (state.channel) state.sb.removeChannel(state.channel);
     state.channel = state.sb.channel("events-changes")
       .on("postgres_changes", { event: "*", schema: "public", table: "events" }, () => {
         clearTimeout(refetchTimer); refetchTimer = setTimeout(loadEvents, 300);
@@ -388,7 +367,6 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
         else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") setStatus("自動更新が止まっています（再読み込みしてください）", false);
       });
   }
-  function stopRealtime() { if (state.channel) { state.sb.removeChannel(state.channel); state.channel = null; } }
 
   /* ---------- 描画 ---------- */
   const kindOf = ev => KIND_BY[ev.kind] || KIND_BY.other;
@@ -413,13 +391,6 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     });
   }
 
-  // 担当の表示名（空欄 = 2人共通）
-  function whoLabel(id) {
-    if (!id) return "2人共通";
-    if (id === state.me) return "自分";
-    return state.profiles[id] || "メンバー";
-  }
-
   // 期間の表示（例：10/5 14:00 〜 10/7 12:00）
   function rangeText(ev) {
     const s = ev.all_day ? "" : " " + hhmm(ev.start_time);
@@ -427,11 +398,14 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     return `${md(ev.event_date)}${s} 〜 ${md(endDateOf(ev))}${e}`;
   }
 
+  // 凡例：担当の色
   function renderLegend() {
     const el = $("legend"); el.textContent = "";
-    KINDS.forEach(k => {
-      const s = document.createElement("span"); s.style.setProperty("--kc", k.color);
-      s.append(document.createElement("i"), k.label); el.append(s);
+    const items = state.members.map(m => ({ label: m.name, color: colorOf(m.id) }))
+      .concat([{ label: "2人共通", color: COMMON_COLOR }]);
+    items.forEach(it => {
+      const s = document.createElement("span"); s.style.setProperty("--kc", it.color);
+      s.append(document.createElement("i"), it.label); el.append(s);
     });
   }
 
@@ -458,7 +432,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       b.setAttribute("aria-label", `${dt.getMonth() + 1}月${dt.getDate()}日 予定${evs.length}件`);
       const n = document.createElement("span"); n.className = "num"; n.textContent = dt.getDate(); b.append(n);
       evs.slice(0, 2).forEach(ev => {
-        const c = document.createElement("span"); c.className = "chip"; c.style.setProperty("--kc", kindOf(ev).color);
+        const c = document.createElement("span"); c.className = "chip"; c.style.setProperty("--kc", colorOf(ev.assignee));
         if (!ev.assignee) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = "共"; c.append(tg); }
         const sh = dayView(ev, ds).short;
         c.append((sh ? sh + " " : "") + ev.title); b.append(c);
@@ -466,7 +440,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       if (evs.length > 2) { const mo = document.createElement("span"); mo.className = "more"; mo.textContent = `+${evs.length - 2}件`; b.append(mo); }
       if (evs.length) {
         const dots = document.createElement("span"); dots.className = "dots";
-        evs.slice(0, 4).forEach(ev => { const d = document.createElement("i"); d.style.setProperty("--kc", kindOf(ev).color); dots.append(d); });
+        evs.slice(0, 4).forEach(ev => { const d = document.createElement("i"); d.style.setProperty("--kc", colorOf(ev.assignee)); dots.append(d); });
         b.append(dots);
       }
       cal.append(b);
@@ -481,20 +455,19 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     const evs = eventsOn(state.sel);
     if (!evs.length) { const li = document.createElement("li"); li.className = "empty"; li.textContent = "この日の予定はまだありません。「＋ 予定を追加」から登録できます。"; list.append(li); return; }
     evs.forEach(ev => {
-      const k = kindOf(ev);
       const li = document.createElement("li");
-      const b = document.createElement("button"); b.type = "button"; b.className = "ev"; b.dataset.id = ev.id; b.style.setProperty("--kc", k.color);
+      const b = document.createElement("button"); b.type = "button"; b.className = "ev"; b.dataset.id = ev.id; b.style.setProperty("--kc", colorOf(ev.assignee));
       const t = document.createElement("div"); t.className = "t";
       t.textContent = dayView(ev, state.sel).time;
       const body = document.createElement("div"); body.style.minWidth = "0";
       const ti = document.createElement("div"); ti.className = "title"; ti.textContent = ev.title;
       const meta = document.createElement("div"); meta.className = "meta";
-      const wh = document.createElement("span"); wh.className = "who" + (ev.assignee ? "" : " common"); wh.textContent = whoLabel(ev.assignee); meta.append(wh);
-      const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = k.label; meta.append(kd);
+      const wh = document.createElement("span"); wh.className = "who"; wh.textContent = whoLabel(ev.assignee); meta.append(wh);
+      const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = kindOf(ev).label; meta.append(kd);
       if (isMulti(ev)) { const rg = document.createElement("span"); rg.textContent = rangeText(ev); meta.append(rg); }
       if (ev.updated_by) {
         const w = document.createElement("span");
-        w.textContent = "更新: " + (ev.updated_by === state.me ? "自分" : (state.profiles[ev.updated_by] || "メンバー"));
+        w.textContent = "更新: " + (ev.updated_by === state.me ? "自分" : nameOf(ev.updated_by));
         meta.append(w);
       }
       body.append(ti, meta);
@@ -525,27 +498,30 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     else render();
   });
   $("agenda").addEventListener("click", e => { const b = e.target.closest(".ev"); if (b) openEventForm(b.dataset.id); });
-  $("addBtn").addEventListener("click", () => openEventForm(null));
+  $("addBtn").addEventListener("click", () => {
+    if (!state.me || memberIndex(state.me) < 0) return openPicker(true);
+    openEventForm(null);
+  });
 
   /* ---------- 予定の入力フォーム ---------- */
   function renderKinds() {
     const box = $("kinds"); box.textContent = "";
     KINDS.forEach(k => {
-      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", k.color);
+      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", "var(--muted)");
       b.setAttribute("aria-pressed", String(state.formKind === k.id));
       b.append(document.createElement("i"), k.label);
       b.addEventListener("click", () => { state.formKind = k.id; renderKinds(); });
       box.append(b);
     });
   }
-  // 担当の選択肢：2人共通 → 自分 → 相手（表示名を登録済みの人）
+
+  // 担当の選択肢：1人目 → 2人目 → 2人共通（それぞれの色付き）
   function renderAssignees() {
     const box = $("assignees"); box.textContent = "";
-    const ids = Object.keys(state.profiles).filter(id => id !== state.me);
-    const opts = [{ id: null, label: "2人共通" }, { id: state.me, label: "自分" }]
-      .concat(ids.map(id => ({ id, label: state.profiles[id] })));
+    const opts = state.members.map(m => ({ id: m.id, label: m.name + (m.id === state.me ? "（自分）" : "") }))
+      .concat([{ id: null, label: "2人共通" }]);
     opts.forEach(o => {
-      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", "var(--accent)");
+      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", colorOf(o.id));
       b.setAttribute("aria-pressed", String(state.formAssignee === o.id));
       b.append(document.createElement("i"), o.label);
       b.addEventListener("click", () => { state.formAssignee = o.id; renderAssignees(); });
@@ -596,8 +572,8 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   function dbErrorText(error) {
     if (!error) return "";
     if (error.code === "23514") return "入力内容を確認してください（件名は80文字まで、終了は開始より後）。";
-    if (error.code === "PGRST204" || error.code === "42703") return "データベースの更新（migration_v2.sql の実行）がまだのようです。（" + error.message + "）";
-    if (error.code === "42501") return "この操作をする権限がありません。ログインし直してください。";
+    if (error.code === "42501") return "保存する権限がありません。Supabase で migration_v3.sql を実行済みか確認してください。";
+    if (error.code === "PGRST204" || error.code === "42703") return "データベースの更新（migration の実行）がまだのようです。（" + error.message + "）";
     return "保存できませんでした。通信状態を確認して、もう一度お試しください。（" + error.message + "）";
   }
 
@@ -617,6 +593,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       title, event_date: date, end_date: endDate, all_day: allDay,
       start_time: allDay ? null : start, end_time: allDay || !end ? null : end,
       kind: state.formKind, assignee: state.formAssignee, memo: $("f-memo").value.trim(),
+      updated_by: state.me,                                       // 更新した人（この端末の利用者）
     };
     showErr("evErr", ""); setEvBusy(true);
     const q = state.editingId
@@ -639,31 +616,10 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     closeEventForm(); loadEvents();
   });
 
-  /* ---------- 表示名 ---------- */
-  function openNameForm(first) {
-    $("n-name").value = state.profiles[state.me] || "";
-    $("nameClose").hidden = !!first;                  // 初回は必ず設定してもらう
-    showErr("nameErr", ""); $("nameOverlay").hidden = false;
-    setTimeout(() => $("n-name").focus(), 0);
-  }
-  $("nameBtn").addEventListener("click", () => openNameForm(false));
-  $("nameClose").addEventListener("click", () => { $("nameOverlay").hidden = true; });
-  $("nameForm").addEventListener("submit", async e => {
-    e.preventDefault();
-    const name = $("n-name").value.trim();
-    if (!name) return showErr("nameErr", "表示名を入力してください。");
-    $("nameSave").disabled = true;
-    const { error } = await state.sb.from("profiles").upsert({ id: state.me, display_name: name });
-    $("nameSave").disabled = false;
-    if (error) return showErr("nameErr", dbErrorText(error));
-    $("nameOverlay").hidden = true;
-    await loadProfiles(); render();
-  });
-
   document.addEventListener("keydown", e => {
     if (e.key !== "Escape") return;
     if (!$("evOverlay").hidden) closeEventForm();
-    else if (!$("nameOverlay").hidden && !$("nameClose").hidden) $("nameOverlay").hidden = true;
+    else if (!$("pickOverlay").hidden && !$("pickClose").hidden) $("pickOverlay").hidden = true;
   });
 })();
 </script>
