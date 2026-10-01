@@ -83,6 +83,9 @@ header{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-betw
 .ev .meta{font-size:12px;color:var(--muted);display:flex;gap:8px;flex-wrap:wrap}
 .ev .memo{font-size:13px;white-space:pre-wrap;overflow-wrap:anywhere;margin-top:2px}
 .kind{font-size:11px;font-weight:700;color:var(--kc)}
+.who{font-size:11px;font-weight:700;padding:0 6px;border-radius:999px;border:1px solid var(--line);color:var(--ink)}
+.who.common{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.tag{font-size:10px;font-weight:700;padding:0 3px;margin-right:3px;border-radius:3px;background:var(--accent);color:var(--on-accent)}
 .empty{color:var(--muted);font-size:14px;padding:18px 4px;text-align:center;border:1px dashed var(--line);border-radius:8px;list-style:none}
 .legend{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:10px}
 .legend span{display:inline-flex;align-items:center;gap:4px}
@@ -184,12 +187,16 @@ textarea{min-height:72px;resize:vertical}
   <form class="sheet" id="evForm" novalidate>
     <h3 id="evFormTitle">予定を追加</h3>
     <div class="field"><label for="f-title">件名</label><input type="text" id="f-title" maxlength="80" placeholder="例：A社と打ち合わせ"></div>
-    <div class="field"><label for="f-date">日付</label><input type="date" id="f-date"></div>
-    <label class="check"><input type="checkbox" id="f-allday"> 終日</label>
-    <div class="row" id="timeRow">
-      <div class="field"><label for="f-start">開始</label><input type="time" id="f-start"></div>
-      <div class="field"><label for="f-end">終了（任意）</label><input type="time" id="f-end"></div>
+    <div class="row">
+      <div class="field"><label for="f-date">開始日</label><input type="date" id="f-date"></div>
+      <div class="field timeField"><label for="f-start">開始時刻</label><input type="time" id="f-start"></div>
     </div>
+    <div class="row">
+      <div class="field"><label for="f-end-date">終了日</label><input type="date" id="f-end-date"></div>
+      <div class="field timeField"><label for="f-end" id="endLabel">終了時刻（任意）</label><input type="time" id="f-end"></div>
+    </div>
+    <label class="check"><input type="checkbox" id="f-allday"> 終日</label>
+    <div class="field"><label id="whoLabel">担当</label><div class="kinds" id="assignees" role="group" aria-labelledby="whoLabel"></div></div>
     <div class="field"><label id="kindLabel">種類</label><div class="kinds" id="kinds" role="group" aria-labelledby="kindLabel"></div></div>
     <div class="field"><label for="f-memo">メモ（場所・持ち物など）</label><textarea id="f-memo" maxlength="1000"></textarea></div>
     <div class="err" id="evErr" hidden></div>
@@ -249,12 +256,22 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   const todayStr = () => { const t = new Date(); return ymd(t.getFullYear(), t.getMonth(), t.getDate()); };
   const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return { y, m: m - 1, d }; };
   const hhmm = t => (t ? String(t).slice(0, 5) : "");               // "09:00:00" → "09:00"
+  const md = s => { const p = parseYmd(s); return `${p.m + 1}/${p.d}`; };   // "2026-10-05" → "10/5"
+
+  /* ---------- 24時間で自動ログアウト（このブラウザに最後のログイン時刻を記録） ---------- */
+  const LOGIN_KEY = "futari_login_at";
+  const LOGIN_MAX_MS = 24 * 60 * 60 * 1000;
+  const getLoginAt = () => { try { return Number(localStorage.getItem(LOGIN_KEY)) || 0; } catch (e) { return 0; } };
+  const setLoginAt = t => { try { localStorage.setItem(LOGIN_KEY, String(t)); } catch (e) {} };
+  const clearLoginAt = () => { try { localStorage.removeItem(LOGIN_KEY); } catch (e) {} };
+  const loginExpired = () => { const t = getLoginAt(); return t > 0 && Date.now() - t > LOGIN_MAX_MS; };
 
   const state = {
     sb: null, session: null, me: null,
     events: [], profiles: {}, loaded: false,
     viewY: new Date().getFullYear(), viewM: new Date().getMonth(), sel: todayStr(),
-    editingId: null, formKind: "meet", channel: null, fetchSeq: 0,
+    editingId: null, formKind: "meet", formAssignee: null, channel: null, fetchSeq: 0,
+    expiredMsg: false,
   };
 
   /* ---------- 画面の切り替え ---------- */
@@ -281,7 +298,13 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   async function onSession(session) {
     const prevUser = state.session && state.session.user.id;
     state.session = session;
-    if (!session) { stopRealtime(); state.events = []; state.loaded = false; show("loginView"); return; }
+    if (!session) {
+      stopRealtime(); clearLoginAt(); state.events = []; state.loaded = false; show("loginView");
+      if (state.expiredMsg) { showErr("loginErr", "ログインから24時間たったため、自動でログアウトしました。もう一度ログインしてください。"); state.expiredMsg = false; }
+      return;
+    }
+    if (!getLoginAt()) setLoginAt(Date.now());                  // 記録がなければ今からの24時間
+    if (loginExpired()) { await expireLogin(); return; }
     if (prevUser === session.user.id && state.loaded) return;  // トークン更新だけなら何もしない
     state.me = session.user.id;
     show("appView");
@@ -298,14 +321,26 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     const email = $("l-email").value.trim(), password = $("l-pass").value;
     if (!email || !password) return showErr("loginErr", "メールアドレスとパスワードを入力してください。");
     showErr("loginErr", ""); $("loginBtn").disabled = true;
+    setLoginAt(Date.now());                                      // ここから24時間ログインが続く
     const { error } = await state.sb.auth.signInWithPassword({ email, password });
     $("loginBtn").disabled = false;
     if (error) {
+      clearLoginAt();
       const bad = error.code === "invalid_credentials" || /invalid login credentials/i.test(error.message || "");
       showErr("loginErr", bad ? "メールアドレスかパスワードが違います。" : "ログインできませんでした（" + (error.message || "通信エラー") + "）。");
     } else { $("l-pass").value = ""; }
   });
-  $("logoutBtn").addEventListener("click", async () => { await state.sb.auth.signOut(); });
+  // scope: "local" = この端末だけログアウト（相手や自分の別端末には影響しない）
+  $("logoutBtn").addEventListener("click", async () => { await state.sb.auth.signOut({ scope: "local" }); });
+
+  async function expireLogin() {
+    state.expiredMsg = true;
+    clearLoginAt();
+    await state.sb.auth.signOut({ scope: "local" });
+  }
+  function checkExpiry() { if (state.session && loginExpired()) expireLogin(); }
+  setInterval(checkExpiry, 60 * 1000);                           // 開きっぱなしでも1分ごとに確認
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) checkExpiry(); });
 
   /* ---------- データの読み込み ---------- */
   function visibleRange() {
@@ -318,8 +353,9 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   async function loadEvents() {
     const seq = ++state.fetchSeq;
     const [from, to] = visibleRange();
+    // 表示中の期間に少しでも重なる予定（開始日 ≦ 表示の最終日 かつ 終了日 ≧ 表示の初日）
     const { data, error } = await state.sb.from("events").select("*")
-      .gte("event_date", from).lte("event_date", to).order("event_date");
+      .lte("event_date", to).gte("end_date", from).order("event_date");
     if (seq !== state.fetchSeq) return;               // 古い読み込み結果は捨てる
     if (error) {
       setStatus("接続できません", false);
@@ -328,7 +364,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     }
     banner("");
     state.events = data; state.loaded = true;
-    if (data.some(ev => ev.updated_by && !state.profiles[ev.updated_by])) await loadProfiles();
+    if (data.some(ev => (ev.updated_by && !state.profiles[ev.updated_by]) || (ev.assignee && !state.profiles[ev.assignee]))) await loadProfiles();
     render();
   }
 
@@ -356,13 +392,39 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
 
   /* ---------- 描画 ---------- */
   const kindOf = ev => KIND_BY[ev.kind] || KIND_BY.other;
+  const endDateOf = ev => ev.end_date || ev.event_date;
+  const isMulti = ev => endDateOf(ev) !== ev.event_date;
+
+  // ある日（ds）にその予定をどう見せるか：time = 時刻欄の文字、key = 並び順、short = カレンダー用
+  function dayView(ev, ds) {
+    const s = hhmm(ev.start_time), e = hhmm(ev.end_time);
+    if (ev.all_day) return { time: "終日", key: "", short: "" };
+    if (!isMulti(ev)) return { time: s + (e ? "\n–" + e : ""), key: s, short: s };
+    if (ds === ev.event_date) return { time: s + "\n–", key: s, short: s + "〜" };
+    if (ds === endDateOf(ev)) return { time: "–" + e, key: "00:00", short: "〜" + e };
+    return { time: "終日", key: "", short: "" };                  // 期間の途中の日
+  }
+
   function eventsOn(ds) {
-    return state.events.filter(ev => ev.event_date === ds).sort((a, b) => {
-      if (a.all_day !== b.all_day) return a.all_day ? -1 : 1;
-      const sa = a.start_time || "", sb = b.start_time || "";
-      if (sa !== sb) return sa < sb ? -1 : 1;
+    return state.events.filter(ev => ev.event_date <= ds && ds <= endDateOf(ev)).sort((a, b) => {
+      const ka = dayView(a, ds).key, kb = dayView(b, ds).key;
+      if (ka !== kb) return ka < kb ? -1 : 1;
       return a.title < b.title ? -1 : 1;
     });
+  }
+
+  // 担当の表示名（空欄 = 2人共通）
+  function whoLabel(id) {
+    if (!id) return "2人共通";
+    if (id === state.me) return "自分";
+    return state.profiles[id] || "メンバー";
+  }
+
+  // 期間の表示（例：10/5 14:00 〜 10/7 12:00）
+  function rangeText(ev) {
+    const s = ev.all_day ? "" : " " + hhmm(ev.start_time);
+    const e = ev.all_day ? "" : " " + hhmm(ev.end_time);
+    return `${md(ev.event_date)}${s} 〜 ${md(endDateOf(ev))}${e}`;
   }
 
   function renderLegend() {
@@ -397,7 +459,9 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       const n = document.createElement("span"); n.className = "num"; n.textContent = dt.getDate(); b.append(n);
       evs.slice(0, 2).forEach(ev => {
         const c = document.createElement("span"); c.className = "chip"; c.style.setProperty("--kc", kindOf(ev).color);
-        c.textContent = (ev.all_day ? "" : hhmm(ev.start_time) + " ") + ev.title; b.append(c);
+        if (!ev.assignee) { const tg = document.createElement("span"); tg.className = "tag"; tg.textContent = "共"; c.append(tg); }
+        const sh = dayView(ev, ds).short;
+        c.append((sh ? sh + " " : "") + ev.title); b.append(c);
       });
       if (evs.length > 2) { const mo = document.createElement("span"); mo.className = "more"; mo.textContent = `+${evs.length - 2}件`; b.append(mo); }
       if (evs.length) {
@@ -421,11 +485,13 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       const li = document.createElement("li");
       const b = document.createElement("button"); b.type = "button"; b.className = "ev"; b.dataset.id = ev.id; b.style.setProperty("--kc", k.color);
       const t = document.createElement("div"); t.className = "t";
-      t.textContent = ev.all_day ? "終日" : hhmm(ev.start_time) + (ev.end_time ? "\n–" + hhmm(ev.end_time) : "");
+      t.textContent = dayView(ev, state.sel).time;
       const body = document.createElement("div"); body.style.minWidth = "0";
       const ti = document.createElement("div"); ti.className = "title"; ti.textContent = ev.title;
       const meta = document.createElement("div"); meta.className = "meta";
+      const wh = document.createElement("span"); wh.className = "who" + (ev.assignee ? "" : " common"); wh.textContent = whoLabel(ev.assignee); meta.append(wh);
       const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = k.label; meta.append(kd);
+      if (isMulti(ev)) { const rg = document.createElement("span"); rg.textContent = rangeText(ev); meta.append(rg); }
       if (ev.updated_by) {
         const w = document.createElement("span");
         w.textContent = "更新: " + (ev.updated_by === state.me ? "自分" : (state.profiles[ev.updated_by] || "メンバー"));
@@ -472,8 +538,35 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       box.append(b);
     });
   }
-  const syncAllDay = () => { $("timeRow").hidden = $("f-allday").checked; };
+  // 担当の選択肢：2人共通 → 自分 → 相手（表示名を登録済みの人）
+  function renderAssignees() {
+    const box = $("assignees"); box.textContent = "";
+    const ids = Object.keys(state.profiles).filter(id => id !== state.me);
+    const opts = [{ id: null, label: "2人共通" }, { id: state.me, label: "自分" }]
+      .concat(ids.map(id => ({ id, label: state.profiles[id] })));
+    opts.forEach(o => {
+      const b = document.createElement("button"); b.type = "button"; b.style.setProperty("--kc", "var(--accent)");
+      b.setAttribute("aria-pressed", String(state.formAssignee === o.id));
+      b.append(document.createElement("i"), o.label);
+      b.addEventListener("click", () => { state.formAssignee = o.id; renderAssignees(); });
+      box.append(b);
+    });
+  }
+
+  // 終日なら時刻欄を隠す。日をまたぐ時間指定の予定は終了時刻が必須
+  const syncAllDay = () => {
+    document.querySelectorAll(".timeField").forEach(el => { el.hidden = $("f-allday").checked; });
+    const multi = $("f-end-date").value && $("f-end-date").value !== $("f-date").value;
+    $("endLabel").textContent = multi ? "終了時刻" : "終了時刻（任意）";
+  };
   $("f-allday").addEventListener("change", syncAllDay);
+  // 開始日を終了日より後にしたら、終了日を開始日に合わせる
+  $("f-date").addEventListener("change", () => {
+    const s = $("f-date").value, e = $("f-end-date").value;
+    if (s && (!e || e < s)) $("f-end-date").value = s;
+    syncAllDay();
+  });
+  $("f-end-date").addEventListener("change", syncAllDay);
 
   function setEvBusy(b) { ["evSave", "delBtn", "doDel", "evClose"].forEach(id => { $(id).disabled = b; }); }
 
@@ -483,12 +576,14 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     $("evFormTitle").textContent = ev ? "予定を編集" : "予定を追加";
     $("f-title").value = ev ? ev.title : "";
     $("f-date").value = ev ? ev.event_date : state.sel;
+    $("f-end-date").value = ev ? endDateOf(ev) : state.sel;
     $("f-allday").checked = ev ? ev.all_day : false;
     $("f-start").value = ev && !ev.all_day ? hhmm(ev.start_time) : "09:00";
     $("f-end").value = ev && !ev.all_day ? hhmm(ev.end_time) : "10:00";
     $("f-memo").value = ev ? ev.memo : "";
     state.formKind = ev && KIND_BY[ev.kind] ? ev.kind : "meet";
-    renderKinds(); syncAllDay();
+    state.formAssignee = ev ? (ev.assignee || null) : state.me;  // 新規は「自分」から
+    renderKinds(); renderAssignees(); syncAllDay();
     $("delBtn").hidden = !ev; $("confirmBox").hidden = true;
     showErr("evErr", ""); setEvBusy(false);
     $("evOverlay").hidden = false;
@@ -500,23 +595,28 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
 
   function dbErrorText(error) {
     if (!error) return "";
-    if (error.code === "23514") return "入力内容を確認してください（件名は80文字まで、終了時刻は開始時刻より後）。";
+    if (error.code === "23514") return "入力内容を確認してください（件名は80文字まで、終了は開始より後）。";
+    if (error.code === "PGRST204" || error.code === "42703") return "データベースの更新（migration_v2.sql の実行）がまだのようです。（" + error.message + "）";
     if (error.code === "42501") return "この操作をする権限がありません。ログインし直してください。";
     return "保存できませんでした。通信状態を確認して、もう一度お試しください。（" + error.message + "）";
   }
 
   $("evForm").addEventListener("submit", async e => {
     e.preventDefault();
-    const title = $("f-title").value.trim(), date = $("f-date").value, allDay = $("f-allday").checked;
-    const start = $("f-start").value, end = $("f-end").value;
+    const title = $("f-title").value.trim(), date = $("f-date").value, endDate = $("f-end-date").value;
+    const allDay = $("f-allday").checked, start = $("f-start").value, end = $("f-end").value;
+    const ymdRe = /^\d{4}-\d{2}-\d{2}$/;
     if (!title) return showErr("evErr", "件名を入力してください。");
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return showErr("evErr", "日付を選んでください。");
+    if (!ymdRe.test(date)) return showErr("evErr", "開始日を選んでください。");
+    if (!ymdRe.test(endDate)) return showErr("evErr", "終了日を選んでください。");
+    if (endDate < date) return showErr("evErr", "終了日は開始日と同じか、それより後にしてください。");
     if (!allDay && !start) return showErr("evErr", "開始時刻を入力するか、「終日」にチェックを入れてください。");
-    if (!allDay && end && end <= start) return showErr("evErr", "終了時刻は開始時刻より後にしてください。");
+    if (!allDay && endDate > date && !end) return showErr("evErr", "日をまたぐ予定は、終了時刻も入力してください。");
+    if (!allDay && endDate === date && end && end <= start) return showErr("evErr", "終了時刻は開始時刻より後にしてください。");
     const row = {
-      title, event_date: date, all_day: allDay,
+      title, event_date: date, end_date: endDate, all_day: allDay,
       start_time: allDay ? null : start, end_time: allDay || !end ? null : end,
-      kind: state.formKind, memo: $("f-memo").value.trim(),
+      kind: state.formKind, assignee: state.formAssignee, memo: $("f-memo").value.trim(),
     };
     showErr("evErr", ""); setEvBusy(true);
     const q = state.editingId
