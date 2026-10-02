@@ -117,6 +117,7 @@ textarea{min-height:72px;resize:vertical}
 .actions{display:flex;gap:8px;flex-wrap:wrap}
 .actions .right{display:flex;gap:8px;margin-left:auto}
 .err{color:var(--danger);font-size:13px}
+.note{font-size:12px;color:var(--muted);padding:8px 10px;border:1px solid var(--line);border-radius:8px}
 .confirm{border:1px solid var(--danger);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 .confirm div{display:flex;gap:8px;justify-content:flex-end}
 </style>
@@ -188,6 +189,7 @@ textarea{min-height:72px;resize:vertical}
     <div class="field"><label id="whoLabel">担当</label><div class="kinds" id="assignees" role="group" aria-labelledby="whoLabel"></div></div>
     <div class="field"><label id="kindLabel">種類</label><div class="kinds" id="kinds" role="group" aria-labelledby="kindLabel"></div></div>
     <div class="field"><label for="f-memo">メモ（場所・持ち物など）</label><textarea id="f-memo" maxlength="1000"></textarea></div>
+    <div class="note" id="importNote" hidden>シフトボードから取り込んだ予定です。次に取り込むと、シフトボードの内容で上書き（または削除）されます。変更はシフトボードで行ってください。</div>
     <div class="err" id="evErr" hidden></div>
     <div class="confirm" id="confirmBox" hidden>
       <span>この予定を削除します。元に戻せません。</span>
@@ -232,6 +234,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     { id: "due",   label: "締切" },
     { id: "out",   label: "外出" },
     { id: "other", label: "その他" },
+    { id: "shift", label: "シフト" },
   ];
   const KIND_BY = Object.fromEntries(KINDS.map(k => [k.id, k]));
   const DOW = ["日", "月", "火", "水", "木", "金", "土"];
@@ -465,6 +468,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       const wh = document.createElement("span"); wh.className = "who"; wh.textContent = whoLabel(ev.assignee); meta.append(wh);
       const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = kindOf(ev).label; meta.append(kd);
       if (isMulti(ev)) { const rg = document.createElement("span"); rg.textContent = rangeText(ev); meta.append(rg); }
+      if (ev.source === "shiftboard") { const sb = document.createElement("span"); sb.textContent = "シフトボードから取り込み"; meta.append(sb); }
       if (ev.updated_by) {
         const w = document.createElement("span");
         w.textContent = "更新: " + (ev.updated_by === state.me ? "自分" : nameOf(ev.updated_by));
@@ -561,6 +565,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     state.formAssignee = ev ? (ev.assignee || null) : state.me;  // 新規は「自分」から
     renderKinds(); renderAssignees(); syncAllDay();
     $("delBtn").hidden = !ev; $("confirmBox").hidden = true;
+    $("importNote").hidden = !(ev && ev.source === "shiftboard");
     showErr("evErr", ""); setEvBusy(false);
     $("evOverlay").hidden = false;
     setTimeout(() => $("f-title").focus(), 0);

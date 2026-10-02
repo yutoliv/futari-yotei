@@ -173,3 +173,120 @@ create policy "events_anon_all" on public.events
 drop policy if exists "profiles_anon_select" on public.profiles;
 create policy "profiles_anon_select" on public.profiles
   for select to anon using (true);
+
+-- ---------- 9. シフトボードの取り込み（v4で追加） ----------
+
+-- 1. 種類に「シフト」を追加
+alter table public.events drop constraint if exists events_kind_check;
+alter table public.events add constraint events_kind_check
+  check (kind in ('meet', 'due', 'out', 'other', 'shift'));
+
+-- 2. 予定の出どころ（空欄 = 画面から登録、'shiftboard' = シフトボードから取り込み）
+alter table public.events add column if not exists source text;
+alter table public.events drop constraint if exists events_source_check;
+alter table public.events add constraint events_source_check
+  check (source is null or source in ('shiftboard'));
+
+create index if not exists events_source_idx on public.events (source, assignee, event_date);
+
+-- 3. 取り込み用の関数
+--   p_member : 取り込む人の利用者ID（profiles.id）
+--   p_lines  : 1行に1つのシフト。「開始|終了|件名」
+--              開始・終了は iPhone の現地時刻で「yyyy-MM-dd HH:mm」
+--              例）2026-10-05 17:00|2026-10-05 22:00|〇〇カフェ
+--   戻り値   : 登録した件数・削除した件数・読み飛ばした行数
+create or replace function public.import_shifts(p_member uuid, p_lines text)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  c_days     constant int := 60;                       -- 置き換える範囲（今から何日先まで）
+  v_now      timestamp := (now() at time zone 'Asia/Tokyo');
+  v_until    timestamp := v_now + make_interval(days => c_days);
+  v_line     text;
+  v_parts    text[];
+  v_title    text;
+  v_start    timestamp;
+  v_end      timestamp;
+  v_all_day  boolean;
+  v_end_date date;
+  v_inserted int := 0;
+  v_deleted  int := 0;
+  v_skipped  int := 0;
+  v_rows     jsonb := '[]'::jsonb;
+  r          jsonb;
+begin
+  if p_member is null or not exists (select 1 from public.profiles where id = p_member) then
+    raise exception '利用者IDが見つかりません: %', p_member using errcode = '22023';
+  end if;
+  -- 空のデータで全部消えてしまうのを防ぐ（カレンダーを読めなかった場合など）
+  if p_lines is null or btrim(p_lines, E' \r\n\t') = '' then
+    raise exception 'シフトが1件も送られていません（何も変更していません）' using errcode = '22023';
+  end if;
+  if char_length(p_lines) > 100000 then
+    raise exception '送られたデータが大きすぎます' using errcode = '22023';
+  end if;
+
+  -- 3-1. 送られた行を読み取る（読み取れない行は数えて読み飛ばす）
+  foreach v_line in array regexp_split_to_array(replace(p_lines, E'\r', ''), E'\n') loop
+    v_line := btrim(v_line);
+    continue when v_line = '';
+    v_parts := regexp_match(v_line, '^(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\s*\|\s*(\d{4}-\d{2}-\d{2} \d{2}:\d{2})\s*\|(.*)$');
+    if v_parts is null then v_skipped := v_skipped + 1; continue; end if;
+    begin
+      v_start := v_parts[1]::timestamp;
+      v_end   := v_parts[2]::timestamp;
+    exception when others then
+      v_skipped := v_skipped + 1; continue;
+    end;
+    v_title := left(coalesce(nullif(btrim(v_parts[3]), ''), 'シフト'), 80);
+    if v_end < v_start then v_skipped := v_skipped + 1; continue; end if;
+    -- 置き換える範囲（今より後に始まり、60日以内）だけを扱う
+    continue when v_start < v_now or v_start >= v_until;
+
+    -- 終日の予定：0:00 開始で 24時間近く（23:59 以上）続くもの
+    v_all_day := v_start::time = '00:00' and v_end - v_start >= interval '23 hours 59 minutes';
+    if v_all_day then
+      -- 終了が翌日 0:00 の場合はその前日までとする
+      v_end_date := greatest(v_start::date, (v_end - interval '1 minute')::date);
+      r := jsonb_build_object('title', v_title, 'event_date', v_start::date, 'end_date', v_end_date,
+                              'all_day', true, 'start_time', null, 'end_time', null);
+    else
+      r := jsonb_build_object('title', v_title, 'event_date', v_start::date, 'end_date', v_end::date,
+                              'all_day', false, 'start_time', v_start::time,
+                              -- 開始と同じ時刻で終わる予定は終了時刻なし
+                              'end_time', case when v_end > v_start then v_end::time end);
+    end if;
+    v_rows := v_rows || r;
+  end loop;
+
+  if jsonb_array_length(v_rows) > 500 then
+    raise exception 'シフトが多すぎます（60日で500件まで）' using errcode = '22023';
+  end if;
+
+  -- 3-2. これから先 60 日分の「取り込んだシフト」を消す
+  delete from public.events e
+  where e.source = 'shiftboard'
+    and e.assignee = p_member
+    and (e.event_date + coalesce(e.start_time, '00:00'::time)) >= v_now
+    and (e.event_date + coalesce(e.start_time, '00:00'::time)) <  v_until;
+  get diagnostics v_deleted = row_count;
+
+  -- 3-3. シフトボードの内容で登録し直す
+  insert into public.events (title, event_date, end_date, all_day, start_time, end_time,
+                             kind, assignee, memo, updated_by, source)
+  select x.title, x.event_date, x.end_date, x.all_day, x.start_time, x.end_time,
+         'shift', p_member, '', p_member, 'shiftboard'
+  from jsonb_to_recordset(v_rows)
+       as x(title text, event_date date, end_date date, all_day boolean, start_time time, end_time time);
+  get diagnostics v_inserted = row_count;
+
+  return jsonb_build_object('inserted', v_inserted, 'deleted', v_deleted, 'skipped', v_skipped);
+end;
+$$;
+
+-- ショートカット（公開キー＝anon）から呼べるようにする
+revoke all on function public.import_shifts(uuid, text) from public;
+grant execute on function public.import_shifts(uuid, text) to anon, authenticated;
