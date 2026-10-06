@@ -4,7 +4,47 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <title>ふたりの予定帳</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect"PS C:\Users\yuuto\futari-yotei> git status
+>> git diff --stat
+On branch main
+Your branch is up to date with 'origin/main'.
+
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git restore <file>..." to discard changes in working directory)
+        modified:   README.md
+        modified:   index.html
+        modified:   schema.sql
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+        migration_v5.sql
+
+no changes added to commit (use "git add" and/or "git commit -a")
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'schema.sql', LF will be replaced by CRLF the next time Git touches it
+ README.md  |   4 ++
+ index.html | 239 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'schema.sql', LF will be replaced by CRLF the next time Git touches it
+ README.md  |   4 ++
+ index.html | 239 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+warning: in the working copy of 'README.md', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'schema.sql', LF will be replaced by CRLF the next time Git touches it
+ README.md  |   4 ++
+ index.html | 239 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ schema.sql |   5 ++
+:
+by CRLF the next time Git touches it
+warning: in the working copy of 'index.html', LF will be replaced by CRLF the next time Git touches it
+warning: in the working copy of 'schema.sql', LF will be replaced by CRLF the next time Git touches it
+ README.md  |   4 ++
+ index.html | 239 ++++++++++++++++++++++++++++++++++++++++++++++++++++++++++---
+ schema.sql |   5 ++
+: href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+JP:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap">
 <style>
@@ -120,6 +160,23 @@ textarea{min-height:72px;resize:vertical}
 .note{font-size:12px;color:var(--muted);padding:8px 10px;border:1px solid var(--line);border-radius:8px}
 .confirm{border:1px solid var(--danger);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:8px;font-size:14px}
 .confirm div{display:flex;gap:8px;justify-content:flex-end}
+/* 過去の予定の候補 */
+.sugwrap{position:relative}
+.sug{position:absolute;left:0;right:0;top:100%;margin-top:4px;z-index:20;background:var(--surface);border:1px solid var(--line);border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.18);max-height:280px;overflow:auto;display:flex;flex-direction:column}
+.sug .sh{font-size:11px;color:var(--muted);padding:6px 10px 4px;letter-spacing:.04em}
+.sug button{display:flex;flex-direction:column;align-items:flex-start;border:0;border-top:1px solid var(--line);border-left:4px solid var(--kc);background:transparent;padding:7px 10px;text-align:left;min-width:0}
+.sug button:hover,.sug button.on{background:var(--accent-soft)}
+.sug .st{font-weight:700;font-size:14px;overflow-wrap:anywhere}
+.sug .sm{font-size:12px;color:var(--muted)}
+/* くり返し */
+.repeat{border:1px solid var(--line);border-radius:8px;padding:10px;display:flex;flex-direction:column;gap:10px}
+.dows{display:flex;gap:6px;flex-wrap:wrap}
+.dows button{flex:1 1 0;min-width:0;max-width:48px;height:34px;border:1px solid var(--line);border-radius:8px;background:var(--surface);font-weight:700}
+.dows button[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.quick{display:flex;gap:6px;flex-wrap:wrap;align-items:center;font-size:12px;color:var(--muted)}
+.preview{font-size:13px;font-weight:700}
+.preview.bad{color:var(--danger)}
+.confirm div{flex-wrap:wrap}
 </style>
 </head>
 <body>
@@ -176,7 +233,7 @@ textarea{min-height:72px;resize:vertical}
 <div class="overlay" id="evOverlay" hidden>
   <form class="sheet" id="evForm" novalidate>
     <h3 id="evFormTitle">予定を追加</h3>
-    <div class="field"><label for="f-title">件名</label><input type="text" id="f-title" maxlength="80" placeholder="例：A社と打ち合わせ"></div>
+    <div class="field sugwrap"><label for="f-title">件名</label><input type="text" id="f-title" maxlength="80" placeholder="例：A社と打ち合わせ" autocomplete="off" role="combobox" aria-autocomplete="list" aria-controls="sug" aria-expanded="false"><div class="sug" id="sug" role="listbox" hidden></div></div>
     <div class="row">
       <div class="field"><label for="f-date">開始日</label><input type="date" id="f-date"></div>
       <div class="field timeField"><label for="f-start">開始時刻</label><input type="time" id="f-start"></div>
@@ -186,14 +243,28 @@ textarea{min-height:72px;resize:vertical}
       <div class="field timeField"><label for="f-end" id="endLabel">終了時刻（任意）</label><input type="time" id="f-end"></div>
     </div>
     <label class="check"><input type="checkbox" id="f-allday"> 終日</label>
+    <div id="repeatArea">
+      <label class="check"><input type="checkbox" id="f-repeat"> 毎週くり返す</label>
+      <div class="repeat" id="repeatBox" hidden>
+        <div class="field"><label id="dowLabel">くり返す曜日</label><div class="dows" id="dows" role="group" aria-labelledby="dowLabel"></div></div>
+        <div class="field"><label for="f-until">くり返しの最終日</label><input type="date" id="f-until"></div>
+        <div class="quick">開始日から
+          <button type="button" class="btn small" data-months="1">1か月</button>
+          <button type="button" class="btn small" data-months="2">2か月</button>
+          <button type="button" class="btn small" data-months="3">3か月</button>
+        </div>
+        <div class="preview" id="repeatPreview"></div>
+      </div>
+    </div>
     <div class="field"><label id="whoLabel">担当</label><div class="kinds" id="assignees" role="group" aria-labelledby="whoLabel"></div></div>
     <div class="field"><label id="kindLabel">種類</label><div class="kinds" id="kinds" role="group" aria-labelledby="kindLabel"></div></div>
     <div class="field"><label for="f-memo">メモ（場所・持ち物など）</label><textarea id="f-memo" maxlength="1000"></textarea></div>
+    <div class="note" id="seriesNote" hidden>くり返しで登録した予定の1件です。ここでの変更は、この日の予定だけに反映されます。</div>
     <div class="note" id="importNote" hidden>シフトボードから取り込んだ予定です。次に取り込むと、シフトボードの内容で上書き（または削除）されます。変更はシフトボードで行ってください。</div>
     <div class="err" id="evErr" hidden></div>
     <div class="confirm" id="confirmBox" hidden>
-      <span>この予定を削除します。元に戻せません。</span>
-      <div><button type="button" class="btn" id="cancelDel">やめる</button><button type="button" class="btn danger" id="doDel">削除する</button></div>
+      <span id="confirmMsg">この予定を削除します。元に戻せません。</span>
+      <div><button type="button" class="btn" id="cancelDel">やめる</button><button type="button" class="btn danger" id="doDelSeries" hidden>この日以降のくり返しをすべて削除</button><button type="button" class="btn danger" id="doDel">削除する</button></div>
     </div>
     <div class="actions">
       <button type="button" class="btn danger" id="delBtn" hidden>削除</button>
@@ -245,6 +316,15 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   const parseYmd = s => { const [y, m, d] = s.split("-").map(Number); return { y, m: m - 1, d }; };
   const hhmm = t => (t ? String(t).slice(0, 5) : "");               // "09:00:00" → "09:00"
   const md = s => { const p = parseYmd(s); return `${p.m + 1}/${p.d}`; };   // "2026-10-05" → "10/5"
+  const toYmd = dt => ymd(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  const addDays = (s, n) => { const p = parseYmd(s); return toYmd(new Date(p.y, p.m, p.d + n)); };
+  const diffDays = (a, b) => { const x = parseYmd(a), y = parseYmd(b); return Math.round((Date.UTC(y.y, y.m, y.d) - Date.UTC(x.y, x.m, x.d)) / 86400000); };
+  const dowOf = s => { const p = parseYmd(s); return new Date(p.y, p.m, p.d).getDay(); };
+  // 開始日から nか月（例：10/7 から1か月 → 11/6 まで）
+  const addMonthsInclusive = (s, n) => { const p = parseYmd(s); return toYmd(new Date(p.y, p.m + n, p.d - 1)); };
+  const newId = () => (window.crypto && crypto.randomUUID) ? crypto.randomUUID()
+    : "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); });
+  const REPEAT_MAX = 200;                                         // 1回のくり返し登録で作れる最大件数
 
   /* ---------- この端末の利用者（ブラウザに記録） ---------- */
   const ME_KEY = "futari_me";
@@ -256,6 +336,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     events: [], members: [], loaded: false,              // members: [{id, name}]（並び順で色が決まる）
     viewY: new Date().getFullYear(), viewM: new Date().getMonth(), sel: todayStr(),
     editingId: null, formKind: "meet", formAssignee: null, channel: null, fetchSeq: 0,
+    formDows: new Set(), history: [], sugItems: [], sugIndex: -1,
   };
 
   /* ---------- 担当の名前と色（2人とも同じ色に見える） ---------- */
@@ -468,6 +549,7 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       const wh = document.createElement("span"); wh.className = "who"; wh.textContent = whoLabel(ev.assignee); meta.append(wh);
       const kd = document.createElement("span"); kd.className = "kind"; kd.textContent = kindOf(ev).label; meta.append(kd);
       if (isMulti(ev)) { const rg = document.createElement("span"); rg.textContent = rangeText(ev); meta.append(rg); }
+      if (ev.series_id) { const sr = document.createElement("span"); sr.textContent = "くり返し"; meta.append(sr); }
       if (ev.source === "shiftboard") { const sb = document.createElement("span"); sb.textContent = "シフトボードから取り込み"; meta.append(sb); }
       if (ev.updated_by) {
         const w = document.createElement("span");
@@ -544,11 +626,147 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
   $("f-date").addEventListener("change", () => {
     const s = $("f-date").value, e = $("f-end-date").value;
     if (s && (!e || e < s)) $("f-end-date").value = s;
-    syncAllDay();
+    syncAllDay(); updateRepeatPreview();
   });
   $("f-end-date").addEventListener("change", syncAllDay);
 
-  function setEvBusy(b) { ["evSave", "delBtn", "doDel", "evClose"].forEach(id => { $(id).disabled = b; }); }
+  /* ---------- 過去の予定の候補（件名を入れると、前に登録した予定を提案） ---------- */
+  // 画面から登録した予定（シフトボードの取り込みは除く）を新しい順に読み、件名ごとに最新の1件を候補にする
+  async function loadHistory() {
+    const { data, error } = await state.sb.from("events")
+      .select("title, event_date, end_date, all_day, start_time, end_time, kind, assignee, memo, updated_at")
+      .is("source", null).order("updated_at", { ascending: false }).limit(500);
+    if (error || !data) return;
+    const seen = new Set();
+    state.history = data.filter(h => { if (seen.has(h.title)) return false; seen.add(h.title); return true; });
+    if (document.activeElement === $("f-title")) renderSug();
+  }
+
+  function sugSummary(h) {
+    const span = diffDays(h.event_date, endDateOf(h));
+    let t = h.all_day ? "終日" : hhmm(h.start_time) + (h.end_time ? "–" + hhmm(h.end_time) : "");
+    if (span > 0) t += `（${span + 1}日間）`;
+    return [t, whoLabel(h.assignee), kindOf(h).label].join("・");
+  }
+
+  function hideSug() { $("sug").hidden = true; $("f-title").setAttribute("aria-expanded", "false"); state.sugIndex = -1; }
+
+  function renderSug() {
+    const box = $("sug");
+    if (state.editingId) return hideSug();                         // 候補は新しい予定のときだけ
+    const q = $("f-title").value.trim();
+    const items = (q ? state.history.filter(h => h.title.includes(q) && h.title !== q) : state.history).slice(0, 8);
+    state.sugItems = items; state.sugIndex = -1;
+    if (!items.length) return hideSug();
+    box.textContent = "";
+    const head = document.createElement("div"); head.className = "sh"; head.textContent = "前に登録した予定から入力"; box.append(head);
+    items.forEach((h, i) => {
+      const b = document.createElement("button"); b.type = "button"; b.setAttribute("role", "option"); b.id = "sug-" + i;
+      b.style.setProperty("--kc", colorOf(h.assignee));
+      const st = document.createElement("span"); st.className = "st"; st.textContent = h.title;
+      const sm = document.createElement("span"); sm.className = "sm"; sm.textContent = sugSummary(h);
+      b.append(st, sm);
+      b.addEventListener("pointerdown", e => e.preventDefault());   // 入力欄からフォーカスを外さない
+      b.addEventListener("click", () => applySuggestion(h));
+      box.append(b);
+    });
+    box.hidden = false; $("f-title").setAttribute("aria-expanded", "true");
+  }
+
+  function markSug() {
+    state.sugItems.forEach((_, i) => { const b = $("sug-" + i); if (b) b.classList.toggle("on", i === state.sugIndex); });
+    const cur = $("sug-" + state.sugIndex); if (cur) cur.scrollIntoView({ block: "nearest" });
+  }
+
+  // 候補を選んだら、件名・時刻・種類・担当・メモを入れる（日付は今選んでいる日のまま）
+  function applySuggestion(h) {
+    $("f-title").value = h.title;
+    const date = $("f-date").value || state.sel;
+    $("f-end-date").value = addDays(date, Math.max(0, diffDays(h.event_date, endDateOf(h))));
+    $("f-allday").checked = !!h.all_day;
+    $("f-start").value = h.all_day ? "09:00" : hhmm(h.start_time);
+    $("f-end").value = h.all_day ? "10:00" : hhmm(h.end_time);
+    state.formKind = KIND_BY[h.kind] ? h.kind : "other";
+    state.formAssignee = !h.assignee ? null : (memberIndex(h.assignee) >= 0 ? h.assignee : state.me);
+    $("f-memo").value = h.memo || "";
+    renderKinds(); renderAssignees(); syncAllDay(); updateRepeatPreview();
+    hideSug();
+  }
+
+  $("f-title").addEventListener("focus", renderSug);
+  $("f-title").addEventListener("input", renderSug);
+  $("f-title").addEventListener("blur", () => setTimeout(() => { if (document.activeElement !== $("f-title")) hideSug(); }, 120));
+  $("f-title").addEventListener("keydown", e => {
+    if ($("sug").hidden) return;
+    const n = state.sugItems.length;
+    if (e.key === "ArrowDown") { e.preventDefault(); state.sugIndex = (state.sugIndex + 1) % n; markSug(); }
+    else if (e.key === "ArrowUp") { e.preventDefault(); state.sugIndex = (state.sugIndex - 1 + n) % n; markSug(); }
+    else if (e.key === "Enter" && state.sugIndex >= 0) { e.preventDefault(); applySuggestion(state.sugItems[state.sugIndex]); }
+    else if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); hideSug(); }
+  });
+
+  /* ---------- 毎週くり返す（例：水木金の 9:00〜16:00 を1か月） ---------- */
+  function renderDows() {
+    const box = $("dows"); box.textContent = "";
+    DOW.forEach((d, i) => {
+      const b = document.createElement("button"); b.type = "button"; b.textContent = d;
+      b.setAttribute("aria-pressed", String(state.formDows.has(i)));
+      b.setAttribute("aria-label", d + "曜日");
+      b.addEventListener("click", () => { state.formDows.has(i) ? state.formDows.delete(i) : state.formDows.add(i); renderDows(); updateRepeatPreview(); });
+      box.append(b);
+    });
+  }
+
+  // 登録する日の一覧（開始日〜最終日のうち、選んだ曜日の日）
+  function repeatDates() {
+    const start = $("f-date").value, until = $("f-until").value, out = [];
+    if (!start || !until || until < start) return out;
+    for (let d = start; d <= until && out.length <= REPEAT_MAX; d = addDays(d, 1)) {
+      if (state.formDows.has(dowOf(d))) out.push(d);
+    }
+    return out;
+  }
+
+  function updateRepeatPreview() {
+    const el = $("repeatPreview");
+    if (!$("f-repeat").checked) { el.textContent = ""; return; }
+    const start = $("f-date").value, until = $("f-until").value;
+    let msg = "", bad = true;
+    if (!state.formDows.size) msg = "くり返す曜日を選んでください。";
+    else if (!until || until < start) msg = "最終日は開始日と同じか、それより後にしてください。";
+    else {
+      const ds = repeatDates();
+      const names = [...state.formDows].sort().map(i => DOW[i]).join("・");
+      if (!ds.length) msg = "この期間に、選んだ曜日の日がありません。";
+      else if (ds.length > REPEAT_MAX) msg = `一度に登録できるのは${REPEAT_MAX}件までです。最終日を早めてください。`;
+      else {
+        // 年をまたぐときは年も表示（例：2026/12/1〜2027/1/31）
+        const fmt = v => (start.slice(0, 4) !== until.slice(0, 4) ? v.slice(0, 4) + "/" : "") + md(v);
+        msg = `${fmt(start)}〜${fmt(until)} の毎週 ${names}：全${ds.length}件を登録します`; bad = false;
+      }
+    }
+    el.textContent = msg; el.classList.toggle("bad", bad);
+  }
+
+  $("f-repeat").addEventListener("change", () => {
+    const on = $("f-repeat").checked;
+    $("repeatBox").hidden = !on;
+    if (on) {
+      const start = $("f-date").value || state.sel;
+      if (!state.formDows.size) state.formDows.add(dowOf(start));  // 最初は開始日の曜日
+      if (!$("f-until").value || $("f-until").value < start) $("f-until").value = addMonthsInclusive(start, 1);
+      renderDows();
+    }
+    updateRepeatPreview();
+  });
+  $("f-until").addEventListener("change", updateRepeatPreview);
+  document.querySelectorAll("#repeatBox [data-months]").forEach(b => b.addEventListener("click", () => {
+    const start = $("f-date").value || state.sel;
+    $("f-until").value = addMonthsInclusive(start, Number(b.dataset.months));
+    updateRepeatPreview();
+  }));
+
+  function setEvBusy(b) { ["evSave", "delBtn", "doDel", "doDelSeries", "evClose"].forEach(id => { $(id).disabled = b; }); }
 
   function openEventForm(id) {
     const ev = id ? state.events.find(x => x.id === id) : null;
@@ -566,6 +784,13 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     renderKinds(); renderAssignees(); syncAllDay();
     $("delBtn").hidden = !ev; $("confirmBox").hidden = true;
     $("importNote").hidden = !(ev && ev.source === "shiftboard");
+    $("seriesNote").hidden = !(ev && ev.series_id);
+    // くり返しは新しい予定のときだけ
+    $("repeatArea").hidden = !!ev;
+    $("f-repeat").checked = false; $("repeatBox").hidden = true; $("f-until").value = "";
+    state.formDows = new Set(); renderDows(); updateRepeatPreview();
+    hideSug();
+    if (!ev) loadHistory();
     showErr("evErr", ""); setEvBusy(false);
     $("evOverlay").hidden = false;
     setTimeout(() => $("f-title").focus(), 0);
@@ -594,6 +819,16 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
     if (!allDay && !start) return showErr("evErr", "開始時刻を入力するか、「終日」にチェックを入れてください。");
     if (!allDay && endDate > date && !end) return showErr("evErr", "日をまたぐ予定は、終了時刻も入力してください。");
     if (!allDay && endDate === date && end && end <= start) return showErr("evErr", "終了時刻は開始時刻より後にしてください。");
+    const repeating = !state.editingId && $("f-repeat").checked;
+    let dates = [date];
+    if (repeating) {
+      if (!state.formDows.size) return showErr("evErr", "くり返す曜日を選んでください。");
+      const until = $("f-until").value;
+      if (!ymdRe.test(until) || until < date) return showErr("evErr", "くり返しの最終日は、開始日と同じか、それより後にしてください。");
+      dates = repeatDates();
+      if (!dates.length) return showErr("evErr", "この期間に、選んだ曜日の日がありません。");
+      if (dates.length > REPEAT_MAX) return showErr("evErr", `一度に登録できるのは${REPEAT_MAX}件までです。最終日を早めてください。`);
+    }
     const row = {
       title, event_date: date, end_date: endDate, all_day: allDay,
       start_time: allDay ? null : start, end_time: allDay || !end ? null : end,
@@ -601,17 +836,39 @@ const SUPABASE_KEY = "sb_publishable_NH8K8K95XaSkmlxjbApp3w_J163dgbj";   // sb_p
       updated_by: state.me,                                       // 更新した人（この端末の利用者）
     };
     showErr("evErr", ""); setEvBusy(true);
-    const q = state.editingId
-      ? state.sb.from("events").update(row).eq("id", state.editingId)
-      : state.sb.from("events").insert(row);
+    let q;
+    if (state.editingId) q = state.sb.from("events").update(row).eq("id", state.editingId);
+    else if (repeating) {
+      // 1日ずつ別の予定として、同じ series_id を付けてまとめて登録
+      const sid = newId(), span = diffDays(date, endDate);
+      q = state.sb.from("events").insert(dates.map(d => Object.assign({}, row, { event_date: d, end_date: addDays(d, span), series_id: sid })));
+    } else q = state.sb.from("events").insert(row);
     const { error } = await q;
     if (error) { setEvBusy(false); return showErr("evErr", dbErrorText(error)); }
-    const p = parseYmd(date);
-    state.sel = date; state.viewY = p.y; state.viewM = p.m;
+    const first = dates[0], p = parseYmd(first);
+    state.sel = first; state.viewY = p.y; state.viewM = p.m;
     closeEventForm(); render(); loadEvents();
   });
 
-  $("delBtn").addEventListener("click", () => { $("confirmBox").hidden = false; });
+  $("delBtn").addEventListener("click", () => {
+    const ev = state.events.find(x => x.id === state.editingId);
+    const series = !!(ev && ev.series_id);
+    $("confirmMsg").textContent = series
+      ? "くり返しで登録した予定です。どちらを削除しますか？元に戻せません。"
+      : "この予定を削除します。元に戻せません。";
+    $("doDel").textContent = series ? "この日だけ削除" : "削除する";
+    $("doDelSeries").hidden = !series;
+    $("confirmBox").hidden = false;
+  });
+  // 同じくり返しのうち、この日以降の予定をすべて削除（この日より前の分は残す）
+  $("doDelSeries").addEventListener("click", async () => {
+    const ev = state.events.find(x => x.id === state.editingId);
+    if (!ev || !ev.series_id) return;
+    setEvBusy(true);
+    const { error } = await state.sb.from("events").delete().eq("series_id", ev.series_id).gte("event_date", ev.event_date);
+    if (error) { setEvBusy(false); return showErr("evErr", dbErrorText(error)); }
+    closeEventForm(); loadEvents();
+  });
   $("cancelDel").addEventListener("click", () => { $("confirmBox").hidden = true; });
   $("doDel").addEventListener("click", async () => {
     if (!state.editingId) return;

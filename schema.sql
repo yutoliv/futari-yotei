@@ -290,3 +290,8 @@ $$;
 -- ショートカット（公開キー＝anon）から呼べるようにする
 revoke all on function public.import_shifts(uuid, text) from public;
 grant execute on function public.import_shifts(uuid, text) to anon, authenticated;
+
+-- ---------- 10. くり返し登録（v5で追加） ----------
+alter table public.events add column if not exists series_id uuid;
+
+create index if not exists events_series_idx on public.events (series_id, event_date);
