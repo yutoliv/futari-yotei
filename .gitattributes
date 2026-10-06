@@ -1,0 +1,28 @@
+# ============================================================
+# 改行コード・ファイルの扱いを全員でそろえる設定
+#   ・テキストファイルは、GitHub上でもPC上でも LF（Unix形式）で保存する
+#     → Windows / Mac が混ざっても「中身は同じなのに変更あり」にならない
+#     → 「LF will be replaced by CRLF」の警告も出なくなる
+#   ・画像などは「バイナリ」として扱い、Gitが中身を書き換えないようにする
+# ============================================================
+
+# 基本：テキストファイルは LF にそろえる
+* text=auto eol=lf
+
+# このリポジトリで使うテキストファイル（念のため明示）
+*.html text eol=lf
+*.css  text eol=lf
+*.js   text eol=lf
+*.json text eol=lf
+*.sql  text eol=lf
+*.md   text eol=lf
+
+# 画像・PDF などは書き換えない
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.webp binary
+*.pdf  binary
+*.zip  binary

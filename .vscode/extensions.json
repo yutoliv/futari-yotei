@@ -1,0 +1,9 @@
+{
+  // このフォルダを VS Code で開いたときに、インストールを勧める拡張機能
+  "recommendations": [
+    // 画面右下の「Go Live」で、PC上でアプリを確認するための拡張機能
+    "ritwickdey.LiveServer",
+    // .editorconfig の設定（インデント・改行コードなど）を VS Code に反映する拡張機能
+    "EditorConfig.EditorConfig"
+  ]
+}

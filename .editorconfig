@@ -1,0 +1,18 @@
+# ============================================================
+# エディタの設定（インデント・文字コード・改行コード）を全員でそろえる
+# VS Code では拡張機能「EditorConfig for VS Code」を入れると有効になります
+# 詳しくは https://editorconfig.org
+# ============================================================
+root = true
+
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+indent_size = 2
+
+# Markdown は行末の空白2つが「改行」の意味になることがあるので消さない
+[*.md]
+trim_trailing_whitespace = false
